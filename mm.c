@@ -214,19 +214,34 @@ void *mm_realloc(void *ptr, size_t size)
 {
     void *oldptr = ptr;
     void *newptr;
-    size_t copySize;
-    
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    // - SIZE_T_SIZE : malloc 시 size+SIZE_T_SIZE 해주기 때문 
+    size_t orgSize, newSize, addSize;
+
+	// - SIZE_T_SIZE : malloc 시 size+SIZE_T_SIZE 해주기 때문 
 	//copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    copySize = GET_SIZE(HDRP(ptr));
-	if (size < copySize)
-      copySize = size;   // 재할당 요청사이즈보다 ,copySize가 더 크면 copySize를 요청 size로 설정
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
+	orgSize = GET_SIZE(HDRP(ptr));
+	newSize = size+DSIZE;	//!!!!+DSIZE 는 헤더 푸터 때문?
+
+	if(newSize <= orgSize){
+		return oldptr;
+	}
+	else{
+		addSize = orgSize + GET_SIZE(HDRP(NEXT_BLKP(oldptr))); 
+		if(!GET_ALLOC(HDRP(NEXT_BLKP(oldptr)))&&(newSize <= addSize)){
+			PUT(HDRP(oldptr), PACK(addSize, 1));
+			PUT(FTRP(oldptr), PACK(addSize, 1));
+			//!!! 근데 이거 뒤에거 프리블록 헤더/푸터 설정안해줘도 되나?
+			return oldptr;
+		}
+		else{
+			newptr = mm_malloc(size);
+			if (newptr == NULL){
+      			return NULL;
+			}
+			memcpy(newptr, oldptr, orgSize);
+    		mm_free(oldptr);
+    		return newptr;
+		}
+	}
 }
 
 static void *find_fit(size_t asize){
