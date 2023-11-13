@@ -216,6 +216,14 @@ void *mm_realloc(void *ptr, size_t size)
     void *newptr;
     size_t orgSize, newSize, addSize;
 
+	/* 예외 처리*/
+	if(ptr == NULL){
+		return mm_malloc(size);
+	}
+	if(size<=0){
+		mm_free(ptr);
+		return 0;
+	}
 	// - SIZE_T_SIZE : malloc 시 size+SIZE_T_SIZE 해주기 때문 
 	//copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
 	orgSize = GET_SIZE(HDRP(ptr));
