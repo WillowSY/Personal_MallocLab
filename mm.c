@@ -34,6 +34,9 @@ team_t team = {
     /* Second member's email address (leave blank if none) */
     ""
 };
+//#define _FIRST
+#define _NEXT
+//#define _BEST
 
 /* single word (4) or double word (8) alignment */ 
 #define ALIGNMENT 8         // 정렬 기준
@@ -72,12 +75,13 @@ team_t team = {
 #define NEXT_BLKP(bp)	((char *)(bp)  + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp)	((char *)(bp)  - GET_SIZE(((char *)(bp) - DSIZE)))
 
+#define GET_SUCC(bp) (*(void **))
 static void *extend_heap(size_t);
 static void *coalesce(void *);
 static void *find_fit(size_t);
 static void place(void *, size_t);
 static void *heap_listp;
-
+static void *next_heap;
 /* 
  * mm_init - initialize the malloc package.
  */
@@ -108,6 +112,7 @@ int mm_init(void)
 	/* Extend the empty heap with a free block of CHUNKSIZE bytes */
 	if(extend_heap(CHUNKSIZE/WSIZE) == NULL)
 		return -1;
+	next_heap = heap_listp;
 	return 0;
 }
 
@@ -137,6 +142,7 @@ static void *coalesce(void *bp)
 	size_t size       = GET_SIZE(HDRP(bp));
 
 	if(prev_alloc && next_alloc){					/* Case 1 */
+		next_heap =bp;
 		return bp;
 	}
 
@@ -153,12 +159,13 @@ static void *coalesce(void *bp)
 		bp = PREV_BLKP(bp);
 	}
 
-	else {																/* Case 4 */
+	else {				/* Case 4 */
 		size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(FTRP(NEXT_BLKP(bp)));
 		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
 		PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
 		bp = PREV_BLKP(bp);
 	}
+	next_heap =bp;
 	return bp;
 }
 
@@ -193,6 +200,7 @@ void *mm_malloc(size_t size)
 	if((bp = extend_heap(extendsize/WSIZE)) == NULL)
 		return NULL;
 	place(bp, asize);
+	next_heap =bp;
 	return bp;
 }
 
@@ -253,6 +261,8 @@ void *mm_realloc(void *ptr, size_t size)
 }
 
 static void *find_fit(size_t asize){
+
+	#ifdef _FIRST
 	void *bp;
 	for(bp = heap_listp;  GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
 		if(!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))){
@@ -260,6 +270,27 @@ static void *find_fit(size_t asize){
 		}
 	}
 	return NULL;
+	#endif
+
+	#ifdef _NEXT
+		void *bp;
+		// if(next_heap == NULL){
+		// 	next_heap = heap_listp;
+		// }
+		for(bp = NEXT_BLKP(next_heap);GET_SIZE(HDRP(bp))>0;bp=NEXT_BLKP(bp)){
+			if(!GET_ALLOC(HDRP(bp))&&(asize<=GET_SIZE(HDRP(bp)))){
+				next_heap =bp;
+				return bp;
+			}
+		}
+		for(bp = NEXT_BLKP(heap_listp);  GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
+			if(!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))){
+				next_heap =bp;
+				return bp;
+			}
+		}
+		return NULL;
+	#endif
 }
 
 static void place(void *bp, size_t asize){
